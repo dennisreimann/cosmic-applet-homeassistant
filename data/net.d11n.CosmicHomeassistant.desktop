@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Home Assistant
+Comment=Configurable Home Assistant entities in the panel
+Comment[de]=Konfigurierbare Home-Assistant-Entitäten im Panel
+Type=Application
+Exec=@BIN@
+Terminal=false
+Categories=COSMIC;
+Keywords=COSMIC;Applet;HomeAssistant;Home;Assistant;
+Icon=net.d11n.CosmicHomeassistant
+StartupNotify=true
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicShrinkable=true
