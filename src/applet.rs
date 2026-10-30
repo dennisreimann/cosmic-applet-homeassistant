@@ -64,6 +64,32 @@ pub fn format_panel_line(values: &EntityValues, entities: &[EntityConfig]) -> St
 }
 
 /// Holt alle konfigurierten Entities parallel.
+/// Mergt Fetch-Ergebnisse in die Wert-Map.
+///
+/// Regel: `Ok` überschreibt immer (neue Daten). `Err` (Request
+/// fehlgeschlagen — Netzwerk, Auth, unbekannte Entity) lässt den zuletzt
+/// angezeigten Wert unangetastet; erst wenn eine Entity noch nie erfolgreich
+/// geladen wurde, erscheint der „—“-Platzhalter. So führt ein
+/// Verbindungsabbruch nicht zu einer leeren Anzeige.
+///
+/// Rückgabe: `true`, wenn mindestens ein neuer Wert übernommen wurde —
+/// nur dann läuft die „Aktualisiert“-Uhr weiter.
+pub fn merge_fetched(
+    values: &mut EntityValues,
+    results: Vec<(String, Result<EntityState, ()>)>,
+) -> bool {
+    let mut any = false;
+    for (id, r) in results {
+        if r.is_ok() {
+            values.insert(id, r);
+            any = true;
+        }
+        // Err: nichts eintragen — der alte Wert bleibt; eine nie geladene
+        // Entity bleibt draußen (Panel lässt sie weg, Popup zeigt „—“).
+    }
+    any
+}
+
 async fn fetch_all(cfg: AppConfig) -> Vec<(String, Result<EntityState, ()>)> {
     let base_url = cfg.instance_url.clone();
     let token = cfg.access_token.clone();
@@ -298,12 +324,9 @@ impl cosmic::Application for HomeAssistantApplet {
                 Task::none()
             }
             Message::Fetched(results) => {
-                for (id, r) in results {
-                    self.values.insert(id, r);
+                if merge_fetched(&mut self.values, results) {
+                    self.last_updated_unix = Some(chrono::Utc::now().timestamp());
                 }
-                self.last_updated_unix = Some(
-                    chrono::Utc::now().timestamp(),
-                );
                 let interval = crate::config::refresh_interval(&self.cfg);
                 Task::perform(tokio::time::sleep(interval), move |_| {
                     cosmic::Action::App(Message::Tick)
