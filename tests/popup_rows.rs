@@ -28,8 +28,22 @@ fn values(
 #[test]
 fn rows_in_config_order_name_left_value_right() {
     let v = values(vec![
-        ("sensor.humidity", Ok(EntityState { state: "62".into(), unit: Some("%".into()), friendly_name: None })),
-        ("sensor.temp", Ok(EntityState { state: "21.5".into(), unit: Some("°C".into()), friendly_name: None })),
+        (
+            "sensor.humidity",
+            Ok(EntityState {
+                state: "62".into(),
+                unit: Some("%".into()),
+                friendly_name: None,
+            }),
+        ),
+        (
+            "sensor.temp",
+            Ok(EntityState {
+                state: "21.5".into(),
+                unit: Some("°C".into()),
+                friendly_name: None,
+            }),
+        ),
     ]);
     // Reihenfolge folgt der Konfiguration, nicht der Fetch-Reihenfolge.
     assert_eq!(
@@ -43,15 +57,24 @@ fn rows_in_config_order_name_left_value_right() {
 
 #[test]
 fn failed_entity_shows_dash() {
-    let e = vec![EntityConfig { entity_id: "sensor.x".into(), name: "X".into() }];
+    let e = vec![EntityConfig {
+        entity_id: "sensor.x".into(),
+        name: "X".into(),
+    }];
     let v = values(vec![("sensor.x", Err(()))]);
     assert_eq!(popup_rows(&v, &e), vec![("X".to_string(), "—".to_string())]);
 }
 
 #[test]
 fn missing_entity_shows_dash() {
-    let e = vec![EntityConfig { entity_id: "sensor.x".into(), name: "X".into() }];
-    assert_eq!(popup_rows(&HashMap::new(), &e), vec![("X".to_string(), "—".to_string())]);
+    let e = vec![EntityConfig {
+        entity_id: "sensor.x".into(),
+        name: "X".into(),
+    }];
+    assert_eq!(
+        popup_rows(&HashMap::new(), &e),
+        vec![("X".to_string(), "—".to_string())]
+    );
 }
 
 #[test]

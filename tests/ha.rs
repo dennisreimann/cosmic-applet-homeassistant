@@ -11,7 +11,8 @@ fn parse_state_with_unit() {
 
 #[test]
 fn parse_state_without_unit() {
-    let body: &str = r#"{"entity_id":"binary_sensor.tuer","state":"on","attributes":{"friendly_name":"Tür"}}"#;
+    let body: &str =
+        r#"{"entity_id":"binary_sensor.tuer","state":"on","attributes":{"friendly_name":"Tür"}}"#;
     let s = ha::parse_state_response(body.as_bytes()).unwrap();
     assert_eq!(s.state, "on");
     assert_eq!(s.unit, None);
@@ -36,7 +37,8 @@ async fn fetch_entity_via_httpmock() {
         );
     });
 
-    let s = ha::fetch_entity(&server.base_url(), "tok", "sensor.test")
+    let client = reqwest::Client::new();
+    let s = ha::fetch_entity(&client, &server.base_url(), "tok", "sensor.test")
         .await
         .unwrap();
     assert_eq!(s.state, "42");
@@ -45,6 +47,7 @@ async fn fetch_entity_via_httpmock() {
 
 #[tokio::test]
 async fn fetch_entity_unknown_entity_is_err() {
+    let client = reqwest::Client::new();
     let server = httpmock::MockServer::start();
     server.mock(|when, then| {
         when.method(httpmock::Method::GET)
@@ -52,7 +55,7 @@ async fn fetch_entity_unknown_entity_is_err() {
         then.status(404).body("Entity not found.");
     });
 
-    let err = ha::fetch_entity(&server.base_url(), "tok", "sensor.missing")
+    let err = ha::fetch_entity(&client, &server.base_url(), "tok", "sensor.missing")
         .await
         .unwrap_err();
     assert!(err.contains("404"), "Fehlermeldung: {err}");

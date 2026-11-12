@@ -3,6 +3,7 @@
 //! HTTP-Fetch (async) plus reine Parser-Funktion, damit das Parsing
 //! ohne Server getestet werden kann.
 
+use reqwest::Url;
 use serde_json::Value;
 
 /// Der angezeigbare Zustand einer Entity.
@@ -17,8 +18,7 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Parst die Antwort von `GET /api/states/<entity_id>`.
 pub fn parse_state_response(body: &[u8]) -> Result<EntityState, String> {
-    let v: Value =
-        serde_json::from_slice(body).map_err(|e| format!("ungültiges JSON: {e}"))?;
+    let v: Value = serde_json::from_slice(body).map_err(|e| format!("ungültiges JSON: {e}"))?;
     let state = v
         .get("state")
         .and_then(|s| s.as_str())
@@ -40,23 +40,21 @@ pub fn parse_state_response(body: &[u8]) -> Result<EntityState, String> {
 
 /// Holt eine Entity per `GET {base_url}/api/states/{entity_id}`.
 pub async fn fetch_entity(
+    client: &reqwest::Client,
     base_url: &str,
     token: &str,
     entity_id: &str,
 ) -> Result<EntityState, String> {
-    let url = format!(
-        "{}/api/states/{}",
-        base_url.trim_end_matches('/'),
-        entity_id
-    );
-    let client = reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .build()
-        .map_err(|e| format!("HTTP-Client: {e}"))?;
+    let mut url =
+        Url::parse(base_url).map_err(|error| format!("Ungültige Instanz-URL: {error}"))?;
+    url.path_segments_mut()
+        .map_err(|_| "Instanz-URL kann keine Pfad-Basis sein".to_string())?
+        .extend(["api", "states", entity_id]);
     let resp = client
-        .get(&url)
+        .get(url.clone())
         .header(reqwest::header::AUTHORIZATION, format!("Bearer {token}"))
         .header(reqwest::header::ACCEPT, "application/json")
+        .timeout(TIMEOUT)
         .send()
         .await
         .map_err(|e| format!("{url}: {e}"))?;

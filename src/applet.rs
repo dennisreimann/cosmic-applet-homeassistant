@@ -1,13 +1,14 @@
 use crate::config::{AppConfig, EntityConfig};
 use crate::fl;
 use crate::ha::{self, EntityState};
+use crate::refresh::RefreshFlow;
+use chrono::{DateTime, Local};
 use cosmic::app::{Core, Task};
 use cosmic::cosmic_theme::Spacing;
 use cosmic::iced::platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup};
-use cosmic::iced::{widget::svg, Alignment, Length, Rectangle, window};
+use cosmic::iced::{widget::svg, window, Alignment, Length, Rectangle};
 use cosmic::widget::{autosize, button, column, container, divider, row, text, Id};
 use cosmic::{applet, theme, Element};
-use chrono::{DateTime, Local};
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -19,13 +20,13 @@ const LOGO_SVG: &str = include_str!("../assets/ha.svg");
 /// neue mtime. Ein Polling per stat() pro Sekunde ist negligible billig —
 /// das erlaubt Auto-Refresh nach Speichern im Settings-Fenster ohne
 /// Subscription-Mechanik.
-async fn wait_for_config_change(baseline: Option<std::time::SystemTime>) -> Option<std::time::SystemTime> {
+async fn wait_for_config_change(
+    baseline: Option<std::time::SystemTime>,
+) -> Option<std::time::SystemTime> {
     let path = crate::config::config_path()?;
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        let mtime = std::fs::metadata(&path)
-            .and_then(|m| m.modified())
-            .ok();
+        let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
         if let Some(t) = mtime {
             if baseline.is_none_or(|b| t != b) {
                 return Some(t);
@@ -90,26 +91,44 @@ pub fn merge_fetched(
     any
 }
 
-async fn fetch_all(cfg: AppConfig) -> Vec<(String, Result<EntityState, ()>)> {
+/// Newest fetch outcome for an entity id. `errors` is separate so old values
+/// survive a failed refresh, but the error remains visible to the user.
+#[derive(Debug, Clone)]
+pub struct FetchOutcome {
+    pub values: Vec<(String, Result<EntityState, ()>)>,
+    pub errors: Vec<String>,
+}
+
+async fn fetch_all(cfg: AppConfig) -> FetchOutcome {
     let base_url = cfg.instance_url.clone();
     let token = cfg.access_token.clone();
     let configured = !base_url.is_empty() && !token.is_empty();
+    let client = reqwest::Client::new();
     let futures = cfg.entities.iter().map(|e| {
         let id = e.entity_id.clone();
         let base_url = base_url.clone();
         let token = token.clone();
+        let client = client.clone();
         async move {
             let r = if !configured {
-                Err(())
+                Err("Home Assistant URL and access token are not configured".to_string())
             } else {
-                ha::fetch_entity(&base_url, &token, &id)
-                    .await
-                    .map_err(|_| ())
+                ha::fetch_entity(&client, &base_url, &token, &id).await
             };
             (id, r)
         }
     });
-    futures_util::future::join_all(futures).await
+    let results = futures_util::future::join_all(futures).await;
+    FetchOutcome {
+        errors: results
+            .iter()
+            .filter_map(|(id, r)| r.as_ref().err().map(|e| format!("{id}: {e}")))
+            .collect(),
+        values: results
+            .into_iter()
+            .map(|(id, r)| (id, r.map_err(|_| ())))
+            .collect(),
+    }
 }
 
 // TODO: Refresh-Intervall siehe oben (konstant).
@@ -127,7 +146,10 @@ pub fn sibling_binary(exe_path: &str, name: &str) -> String {
 /// Path of the settings binary next to the running applet binary.
 pub fn settings_binary_path() -> Option<String> {
     let exe = std::env::current_exe().ok()?;
-    Some(sibling_binary(&exe.to_string_lossy(), "cosmic-applet-homeassistant-settings"))
+    Some(sibling_binary(
+        &exe.to_string_lossy(),
+        "cosmic-applet-homeassistant-settings",
+    ))
 }
 
 /// Startet das Applet (aufgerufen aus `main`).
@@ -140,8 +162,8 @@ pub enum Message {
     /// Button-Bounds (in Fenster-Koordinaten) für die Popup-Positionierung.
     TogglePopup(Rectangle),
     PopupClosed(window::Id),
-    Fetched(Vec<(String, Result<EntityState, ()>)>),
-    Tick,
+    Fetched(u64, FetchOutcome),
+    Tick(u64),
     /// Config-Datei hat sich geändert (Settings-Fenster hat gespeichert).
     ConfigChanged(Option<std::time::SystemTime>),
     OpenSettings,
@@ -158,6 +180,8 @@ pub struct HomeAssistantApplet {
     config_mtime: Option<std::time::SystemTime>,
     /// Letzter abgeschlossener Fetch-Cycle (Unix-Sekunden).
     last_updated_unix: Option<i64>,
+    flow: RefreshFlow,
+    errors: Vec<String>,
 }
 
 /// Popup-Zeilen: (Anzeigename, Wert) in Konfig-Reihenfolge.
@@ -205,7 +229,12 @@ fn panel_element(state: &HomeAssistantApplet) -> Element<'_, Message> {
 }
 
 fn popup_element(state: &HomeAssistantApplet) -> Element<'_, Message> {
-    let Spacing { space_xxs, space_s, space_m, .. } = cosmic::theme::active().cosmic().spacing;
+    let Spacing {
+        space_xxs,
+        space_s,
+        space_m,
+        ..
+    } = cosmic::theme::active().cosmic().spacing;
 
     let mut col = column![]
         .padding([space_s, 0, space_xxs, 0])
@@ -227,6 +256,12 @@ fn popup_element(state: &HomeAssistantApplet) -> Element<'_, Message> {
     col = col.push(head);
 
     col = col.push(container(divider::horizontal::default()).padding([space_xxs, 0]));
+    if !state.errors.is_empty() {
+        col = col.push(
+            container(text::body(fl!("fetch-error", e = state.errors.join("; "))))
+                .padding([0, space_m]),
+        );
+    }
 
     // Entity-Werte-Zeilen (Label links, Wert + Einheit rechts).
     let rows = popup_rows(&state.values, &state.cfg.entities);
@@ -235,12 +270,9 @@ fn popup_element(state: &HomeAssistantApplet) -> Element<'_, Message> {
     } else {
         for (name, value) in rows {
             col = col.push(
-                row![
-                    text::body(name).width(Length::Fill),
-                    text::body(value),
-                ]
-                .padding([0, space_m])
-                .spacing(space_s),
+                row![text::body(name).width(Length::Fill), text::body(value),]
+                    .padding([0, space_m])
+                    .spacing(space_s),
             );
         }
     }
@@ -248,7 +280,8 @@ fn popup_element(state: &HomeAssistantApplet) -> Element<'_, Message> {
     // Trennlinie direkt über der Beenden-Zeile: kein unteres Padding,
     // damit der Abstand zur Menü-Zeile nicht zu groß wird.
     col = col.push(container(divider::horizontal::default()).padding([space_xxs, 0, 0, 0]));
-    col = col.push(applet::menu_button(text::body(fl!("settings"))).on_press(Message::OpenSettings));
+    col =
+        col.push(applet::menu_button(text::body(fl!("settings"))).on_press(Message::OpenSettings));
     col = col.push(applet::menu_button(text::body(fl!("quit"))).on_press(Message::Quit));
     container(col).into()
 }
@@ -267,13 +300,18 @@ impl cosmic::Application for HomeAssistantApplet {
             values: EntityValues::new(),
             config_mtime: None,
             last_updated_unix: None,
+            flow: RefreshFlow::default(),
+            errors: Vec::new(),
         };
         app.cfg = crate::config::load();
+        let generation = app.flow.start();
         let cfg = app.cfg.clone();
         (
             app,
             Task::batch(vec![
-                Task::perform(fetch_all(cfg), |r| cosmic::Action::App(Message::Fetched(r))),
+                Task::perform(fetch_all(cfg), move |outcome| {
+                    cosmic::Action::App(Message::Fetched(generation, outcome))
+                }),
                 Task::perform(wait_for_config_change(None), |t| {
                     cosmic::Action::App(Message::ConfigChanged(t))
                 }),
@@ -323,49 +361,57 @@ impl cosmic::Application for HomeAssistantApplet {
                 }
                 Task::none()
             }
-            Message::Fetched(results) => {
-                if merge_fetched(&mut self.values, results) {
+            Message::Fetched(generation, outcome) => {
+                if !self.flow.accept_finished(generation) {
+                    return Task::none();
+                }
+                self.flow.finished(generation);
+                self.errors = outcome.errors;
+                if merge_fetched(&mut self.values, outcome.values) {
                     self.last_updated_unix = Some(chrono::Utc::now().timestamp());
                 }
                 let interval = crate::config::refresh_interval(&self.cfg);
                 Task::perform(tokio::time::sleep(interval), move |_| {
-                    cosmic::Action::App(Message::Tick)
+                    cosmic::Action::App(Message::Tick(generation))
                 })
             }
-            Message::Tick => {
+            Message::Tick(generation) => {
+                if !self.flow.tick(generation) {
+                    return Task::none();
+                }
                 let cfg = self.cfg.clone();
-                Task::perform(fetch_all(cfg), |r| {
-                    cosmic::Action::App(Message::Fetched(r))
+                let generation = self.flow.start();
+                Task::perform(fetch_all(cfg), move |r| {
+                    cosmic::Action::App(Message::Fetched(generation, r))
                 })
             }
             Message::ConfigChanged(mtime) => {
                 self.config_mtime = mtime;
                 self.cfg = crate::config::load();
                 let cfg = self.cfg.clone();
+                let generation = self.flow.start();
                 Task::batch(vec![
-                    Task::perform(fetch_all(cfg), |r| {
-                        cosmic::Action::App(Message::Fetched(r))
+                    Task::perform(fetch_all(cfg), move |r| {
+                        cosmic::Action::App(Message::Fetched(generation, r))
                     }),
                     Task::perform(wait_for_config_change(mtime), |t| {
                         cosmic::Action::App(Message::ConfigChanged(t))
                     }),
                 ])
             }
-            Message::OpenSettings => {
-                match settings_binary_path() {
-                    Some(path) => {
-                        let child = std::process::Command::new(path).spawn();
-                        if let Err(e) = child {
-                            tracing::error!("Settings-Fenster starten: {e}");
-                        }
-                        Task::none()
+            Message::OpenSettings => match settings_binary_path() {
+                Some(path) => {
+                    let child = std::process::Command::new(path).spawn();
+                    if let Err(e) = child {
+                        tracing::error!("Settings-Fenster starten: {e}");
                     }
-                    None => {
-                        tracing::error!("Settings-Binary nicht gefunden");
-                        Task::none()
-                    }
+                    Task::none()
                 }
-            }
+                None => {
+                    tracing::error!("Settings-Binary nicht gefunden");
+                    Task::none()
+                }
+            },
             Message::Quit => {
                 std::process::exit(0);
             }
@@ -394,10 +440,7 @@ impl cosmic::Application for HomeAssistantApplet {
     }
 
     fn view_window(&self, _id: window::Id) -> Element<'_, Message> {
-        self.core
-            .applet
-            .popup_container(popup_element(self))
-            .into()
+        self.core.applet.popup_container(popup_element(self)).into()
     }
 
     fn on_close_requested(&self, id: window::Id) -> Option<Message> {

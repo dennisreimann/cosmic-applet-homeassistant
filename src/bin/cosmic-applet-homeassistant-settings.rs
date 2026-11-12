@@ -7,7 +7,7 @@
 
 use cosmic::app::{Core, Task};
 use cosmic::cosmic_theme::Spacing;
-use cosmic::iced::{Alignment, Length, window};
+use cosmic::iced::{window, Alignment, Length};
 use cosmic::widget::{button, column, container, divider, row, scrollable, text, text_input};
 use cosmic::{Application, Element};
 use cosmic_applet_homeassistant::config::{self, AppConfig, EntityConfig};
@@ -82,11 +82,8 @@ impl Application for SettingsApp {
             rows: cfg.entities.clone(),
         };
         app.core.set_header_title(fl!("settings-title"));
-        let title_task = cosmic::ApplicationExt::set_window_title(
-            &mut app,
-            fl!("settings-title"),
-            main_id,
-        );
+        let title_task =
+            cosmic::ApplicationExt::set_window_title(&mut app, fl!("settings-title"), main_id);
         (app, title_task)
     }
 
@@ -139,8 +136,7 @@ impl Application for SettingsApp {
             }),
             Message::RemoveRow(i) => config::remove_row(&mut self.rows, &mut self.boundary, i),
             Message::Save => {
-                let refresh_minutes: u32 =
-                    self.refresh_minutes.trim().parse().unwrap_or(1);
+                let refresh_minutes: u32 = self.refresh_minutes.trim().parse().unwrap_or(1);
                 let cfg = AppConfig {
                     instance_url: self.url.trim().trim_end_matches('/').to_string(),
                     access_token: self.token.trim().to_string(),
@@ -183,7 +179,10 @@ impl Application for SettingsApp {
             ..
         } = binding.cosmic().spacing;
 
-        let mut col = column![].padding(space_m).spacing(space_s).width(Length::Fill);
+        let mut col = column![]
+            .padding(space_m)
+            .spacing(space_s)
+            .width(Length::Fill);
 
         // Label + Input als Gruppe: Abstand halbiert (space_xxxs statt
         // space_s), damit das Label optisch am Input hängt.
@@ -199,8 +198,7 @@ impl Application for SettingsApp {
 
         col = col.push(labeled(
             fl!("instance-url"),
-            text_input::text_input(fl!("instance-url"), &self.url)
-                .on_input(Message::UrlChanged),
+            text_input::text_input(fl!("instance-url"), &self.url).on_input(Message::UrlChanged),
             space_xxxs as f32,
         ));
 
@@ -228,19 +226,15 @@ impl Application for SettingsApp {
             .spacing(space_xxxs),
         );
 
-        col = col.push(
-            container(text::heading(fl!("entities-header")))
-                .padding([space_xxs, 0, 0, 0]),
-        );
+        col = col
+            .push(container(text::heading(fl!("entities-header"))).padding([space_xxs, 0, 0, 0]));
 
         // Entfernen-Kreuz (X) in kräftigem Rot, quadratisch in Input-Höhe,
         // runde Ecken via Button-Style.
         let trash_button = |i: usize| {
-            let trash_icon = cosmic::widget::icon::icon(
-                cosmic::widget::icon::Handle::from(
-                    cosmic::widget::icon::from_name("window-close-symbolic"),
-                ),
-            )
+            let trash_icon = cosmic::widget::icon::icon(cosmic::widget::icon::Handle::from(
+                cosmic::widget::icon::from_name("window-close-symbolic"),
+            ))
             .size(16)
             .class(cosmic::theme::Svg::custom(move |_| {
                 cosmic::iced::widget::svg::Style {
@@ -315,9 +309,7 @@ impl Application for SettingsApp {
             .width(Length::Fill),
         );
 
-        container(scrollable(col))
-            .width(Length::Fill)
-            .into()
+        container(scrollable(col)).width(Length::Fill).into()
     }
 
     fn style(&self) -> Option<cosmic::iced::theme::Style> {

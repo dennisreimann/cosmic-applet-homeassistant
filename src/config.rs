@@ -163,9 +163,8 @@ impl AppConfig {
 
 /// Speichert die Konfiguration am Standardpfad (Rechte `0600` unter Unix).
 pub fn save(cfg: &AppConfig) -> std::io::Result<()> {
-    let path = config_path().ok_or_else(|| {
-        std::io::Error::other("kein Config-Verzeichnis ermittelbar")
-    })?;
+    let path = config_path()
+        .ok_or_else(|| std::io::Error::other("kein Config-Verzeichnis ermittelbar"))?;
     save_to(&path, cfg)
 }
 

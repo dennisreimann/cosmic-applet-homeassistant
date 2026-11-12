@@ -18,3 +18,4 @@ entities-header = Entities
 refresh-interval = Refresh interval
 updated-at = Updated: { $t }
 minutes = Minutes
+fetch-error = Refresh failed: { $e }. Last successful values are kept.

@@ -34,8 +34,22 @@ fn empty_entity_list_renders_empty_line() {
 #[test]
 fn values_in_config_order_with_unit() {
     let v = values(vec![
-        ("sensor.temp", Ok(EntityState { state: "21.5".into(), unit: Some("°C".into()), friendly_name: None })),
-        ("sensor.humidity", Ok(EntityState { state: "62".into(), unit: Some("%".into()), friendly_name: None })),
+        (
+            "sensor.temp",
+            Ok(EntityState {
+                state: "21.5".into(),
+                unit: Some("°C".into()),
+                friendly_name: None,
+            }),
+        ),
+        (
+            "sensor.humidity",
+            Ok(EntityState {
+                state: "62".into(),
+                unit: Some("%".into()),
+                friendly_name: None,
+            }),
+        ),
     ]);
     assert_eq!(format_panel_line(&v, &entities()), "21.5 °C · 62 %");
 }
@@ -44,17 +58,31 @@ fn values_in_config_order_with_unit() {
 fn failed_entity_renders_dash() {
     let v = values(vec![
         ("sensor.temp", Err(())),
-        ("sensor.humidity", Ok(EntityState { state: "62".into(), unit: Some("%".into()), friendly_name: None })),
+        (
+            "sensor.humidity",
+            Ok(EntityState {
+                state: "62".into(),
+                unit: Some("%".into()),
+                friendly_name: None,
+            }),
+        ),
     ]);
     assert_eq!(format_panel_line(&v, &entities()), "— · 62 %");
 }
 
 #[test]
 fn value_without_unit_has_no_unit_suffix() {
-    let e = vec![EntityConfig { entity_id: "b.tuer".into(), name: "Tür".into() }];
+    let e = vec![EntityConfig {
+        entity_id: "b.tuer".into(),
+        name: "Tür".into(),
+    }];
     let v = values(vec![(
         "b.tuer",
-        Ok(EntityState { state: "on".into(), unit: None, friendly_name: None }),
+        Ok(EntityState {
+            state: "on".into(),
+            unit: None,
+            friendly_name: None,
+        }),
     )]);
     assert_eq!(format_panel_line(&v, &e), "on");
 }
@@ -74,7 +102,11 @@ fn merge_failed_requests_keep_old_values_and_skip_clock() {
 
     let mut m: HashMap<String, Result<EntityState, ()>> = HashMap::from([(
         "sensor.temp".to_string(),
-        Ok(EntityState { state: "21.5".into(), unit: Some("°C".into()), friendly_name: None }),
+        Ok(EntityState {
+            state: "21.5".into(),
+            unit: Some("°C".into()),
+            friendly_name: None,
+        }),
     )]);
     let results = vec![
         ("sensor.temp".to_string(), Err::<EntityState, ()>(())),
@@ -85,7 +117,9 @@ fn merge_failed_requests_keep_old_values_and_skip_clock() {
     // bleibt leer (→ „—“ in der Anzeige).
     assert!(!merge_fetched(&mut m, results));
     assert_eq!(
-        m.get("sensor.temp").and_then(|r| r.as_ref().ok()).map(|s| s.state.as_str()),
+        m.get("sensor.temp")
+            .and_then(|r| r.as_ref().ok())
+            .map(|s| s.state.as_str()),
         Some("21.5")
     );
     assert!(!m.contains_key("sensor.neu"));
@@ -98,19 +132,29 @@ fn merge_ok_updates_values_and_ticks_clock() {
 
     let mut m: HashMap<String, Result<EntityState, ()>> = HashMap::from([(
         "sensor.temp".to_string(),
-        Ok(EntityState { state: "21.5".into(), unit: Some("°C".into()), friendly_name: None }),
+        Ok(EntityState {
+            state: "21.5".into(),
+            unit: Some("°C".into()),
+            friendly_name: None,
+        }),
     )]);
     let results = vec![
         (
             "sensor.temp".to_string(),
-            Ok(EntityState { state: "22.0".into(), unit: Some("°C".into()), friendly_name: None }),
+            Ok(EntityState {
+                state: "22.0".into(),
+                unit: Some("°C".into()),
+                friendly_name: None,
+            }),
         ),
         ("sensor.down".to_string(), Err::<EntityState, ()>(())),
     ];
 
     assert!(merge_fetched(&mut m, results));
     assert_eq!(
-        m.get("sensor.temp").and_then(|r| r.as_ref().ok()).map(|s| s.state.as_str()),
+        m.get("sensor.temp")
+            .and_then(|r| r.as_ref().ok())
+            .map(|s| s.state.as_str()),
         Some("22.0")
     );
     // Fehlgeschlagener Request überschreibt nicht → alter Wert, kein „—“.
