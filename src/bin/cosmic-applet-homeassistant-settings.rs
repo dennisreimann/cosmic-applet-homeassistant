@@ -59,6 +59,7 @@ struct SettingsApp {
     /// Grenzindex: rows[..boundary] erscheint im Panel. rows.len() = alle.
     boundary: usize,
     rows: Vec<EntityConfig>,
+    error: Option<String>,
 }
 
 impl Application for SettingsApp {
@@ -80,6 +81,13 @@ impl Application for SettingsApp {
                 None => cfg.entities.len(),
             },
             rows: cfg.entities.clone(),
+            error: cosmic_applet_homeassistant::config::config_path().and_then(|path| {
+                std::fs::read_to_string(path).ok().and_then(|source| {
+                    toml::from_str::<AppConfig>(&source)
+                        .err()
+                        .map(|error| error.to_string())
+                })
+            }),
         };
         app.core.set_header_title(fl!("settings-title"));
         let title_task =
@@ -136,7 +144,14 @@ impl Application for SettingsApp {
             }),
             Message::RemoveRow(i) => config::remove_row(&mut self.rows, &mut self.boundary, i),
             Message::Save => {
-                let refresh_minutes: u32 = self.refresh_minutes.trim().parse().unwrap_or(1);
+                let refresh_minutes = match self.refresh_minutes.trim().parse::<u32>() {
+                    Ok(value) if (1..=1440).contains(&value) => value,
+                    _ => {
+                        self.error =
+                            Some("Enter a whole number of minutes between 1 and 1440".to_string());
+                        return Task::none();
+                    }
+                };
                 let cfg = AppConfig {
                     instance_url: self.url.trim().trim_end_matches('/').to_string(),
                     access_token: self.token.trim().to_string(),
@@ -156,10 +171,14 @@ impl Application for SettingsApp {
                         .collect(),
                     refresh_minutes: refresh_minutes.clamp(1, 1440),
                 };
-                if let Err(e) = cosmic_applet_homeassistant::config::save(&cfg) {
-                    eprintln!("Config speichern fehlgeschlagen: {e}");
+                if let Err(error) = cosmic_applet_homeassistant::config::save(&cfg) {
+                    self.error = Some(error.to_string());
+                    return Task::none();
                 }
-                return window::close(self.core.main_window_id().unwrap());
+                return self
+                    .core
+                    .main_window_id()
+                    .map_or_else(Task::none, window::close);
             }
         }
         Task::none()
@@ -183,6 +202,9 @@ impl Application for SettingsApp {
             .padding(space_m)
             .spacing(space_s)
             .width(Length::Fill);
+        if let Some(error) = &self.error {
+            col = col.push(text::body(fl!("error-line", e = error)));
+        }
 
         // Label + Input als Gruppe: Abstand halbiert (space_xxxs statt
         // space_s), damit das Label optisch am Input hängt.

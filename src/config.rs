@@ -137,14 +137,21 @@ pub fn load() -> AppConfig {
 /// Lädt die Konfiguration aus einer Datei. Fehlt die Datei oder ist sie
 /// ungültig, wird der Default zurückgegeben (keine Panik). Ohne env-Fallback.
 pub fn load_from(path: &Path) -> AppConfig {
-    let mut cfg = std::fs::read_to_string(path)
-        .ok()
-        .and_then(|s| toml::from_str::<AppConfig>(&s).ok())
-        .unwrap_or_default();
-    if cfg.refresh_minutes == 0 {
-        cfg.refresh_minutes = default_refresh_minutes();
+    match std::fs::read_to_string(path) {
+        Ok(source) => match toml::from_str::<AppConfig>(&source) {
+            Ok(mut config) => {
+                if config.refresh_minutes == 0 {
+                    config.refresh_minutes = default_refresh_minutes();
+                }
+                config
+            }
+            Err(error) => {
+                eprintln!("cosmic-applet-homeassistant config: {error}");
+                AppConfig::default()
+            }
+        },
+        Err(_) => AppConfig::default(),
     }
-    cfg
 }
 
 impl AppConfig {
@@ -175,12 +182,23 @@ pub fn save_to(path: &Path, cfg: &AppConfig) -> std::io::Result<()> {
     }
     let body = toml::to_string(cfg)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-    std::fs::write(path, body)?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| std::io::Error::other("no config directory"))?;
+    std::fs::create_dir_all(parent)?;
+    let mut file = tempfile::Builder::new()
+        .prefix(".config-")
+        .tempfile_in(parent)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        file.as_file()
+            .set_permissions(std::fs::Permissions::from_mode(0o600))?;
     }
+    use std::io::Write;
+    file.write_all(body.as_bytes())?;
+    file.as_file().sync_all()?;
+    file.persist(path).map_err(|error| error.error)?;
     Ok(())
 }
 

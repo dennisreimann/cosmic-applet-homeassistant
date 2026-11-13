@@ -18,4 +18,5 @@ entities-header = Entities
 refresh-interval = Aktualisierungsintervall
 updated-at = Aktualisiert: { $t }
 minutes = Minuten
+error-line = Fehler: { $e }
 fetch-error = Aktualisierung fehlgeschlagen: { $e }. Die letzten erfolgreichen Werte bleiben sichtbar.
