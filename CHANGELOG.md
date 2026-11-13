@@ -11,6 +11,23 @@ then renamed to the new version and emptied).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-13
+
+### Fixed
+
+- A settings save mid-refresh no longer spawns parallel refresh chains
+  (generation-based sequencing; stale results and timers are discarded).
+- Failed entity fetches keep the last known values and are listed in the
+  popup (`fetch-error`); entity URLs are built via the URL builder, so
+  entity IDs are no longer percent-encoded twice.
+- Config writes are atomic (tempfile, 0600 before persist); TOML parse
+  errors are logged instead of silently defaulting.
+- Settings: invalid intervals and save failures are shown and the window
+  stays open instead of closing as if saved; a broken config file is
+  flagged at startup.
+- Release archives now ship the settings binary and icon; `install.sh`
+  works from a source checkout and an extracted archive, from any cwd.
+
 ## [1.1.0] - 2026-10-30
 
 ### Fixed
