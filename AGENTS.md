@@ -107,6 +107,27 @@ refresh loop. Do not redesign these mechanisms — extend them.
   `~/.local/share/applications/net.d11n.CosmicHomeassistant.desktop`,
   icon → `~/.local/share/icons/hicolor/scalable/apps/` — without an icon
   the applet list in COSMIC settings shows nothing).
+
+## Reliability patterns (v1.2.0)
+
+- **Refresh sequencing:** `src/refresh.rs` (`RefreshFlow`) — same
+  generation/token pattern as the Bitcoin applet (duplicated, no shared
+  crate): `Fetched(u64, FetchOutcome)` / `Tick(u64)` carry the generation;
+  stale results are dropped and exactly one timer is installed per accepted
+  fetch, so config changes mid-flight cannot spawn parallel chains.
+- **Fetch outcome:** `FetchOutcome { values, errors }` — a failed entity
+  fetch keeps the old value and appears in the popup `fetch-error` line;
+  `fetch_entity(&reqwest::Client, base_url, token, entity_id)` shares one
+  client per cycle. URLs are built via `reqwest::Url::path_segments_mut`
+  (extend with the RAW entity id — pre-encoding causes double-encoding,
+  e.g. `sensor%252Etest`; the URL builder encodes exactly once).
+- **Config robustness:** `load_from` logs TOML parse errors instead of
+  silently defaulting; `save_to` is atomic (`tempfile` in the config dir,
+  `0600` before persist). The settings window shows `error-line` for a
+  broken config at startup and for save/validation failures (window stays
+  open); interval must be a whole number 1–1440 minutes.
+- **Installer:** works from a source checkout and an extracted release
+  archive; CI must package the settings binary and icon into the tar.gz.
 - Panel config: `~/.config/cosmic/com.system76.CosmicPanel.Panel/v1
   /plugins_wings` (RON). `./restart-applet.sh` toggles the panel entry for
   a hot reload.
