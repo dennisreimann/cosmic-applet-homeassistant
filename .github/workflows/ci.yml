@@ -62,8 +62,10 @@ jobs:
 
       - name: Install script packaging
         run: |
-          mkdir -p dist
+          mkdir -p dist/assets
           cp target/release/cosmic-applet-homeassistant dist/
+          cp target/release/cosmic-applet-homeassistant-settings dist/
+          cp assets/ha.svg dist/assets/
           cp data/net.d11n.CosmicHomeassistant.desktop dist/
           cp install.sh dist/
           chmod +x dist/install.sh
