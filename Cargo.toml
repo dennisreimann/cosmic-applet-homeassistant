@@ -5,7 +5,10 @@ edition = "2021"
 description = "COSMIC panel applet showing configurable Home Assistant entities"
 
 [dependencies]
-libcosmic = { git = "https://github.com/pop-os/libcosmic", default-features = false, features = [
+# Revision gepinnt: die Applet-Patterns (Popup, Autosize) sind gegen
+# genau diese libcosmic-Revision verifiziert; cargo update darf sie nicht
+# verschieben (siehe AGENTS.md).
+libcosmic = { git = "https://github.com/pop-os/libcosmic", rev = "95236a944bfd51c63a2fc65fe50a592c47168d40", default-features = false, features = [
     "applet",
     "applet-token",
     "dbus-config",
@@ -20,8 +23,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls-native-roots"], default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-dirs = "5"
-toml = "0.8"
+dirs = "7"
+toml = "1"
 tempfile = "3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

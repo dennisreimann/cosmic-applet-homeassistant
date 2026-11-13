@@ -99,9 +99,10 @@ refresh loop. Do not redesign these mechanisms — extend them.
 - Translations: add strings via `fl!("message-id")` in both catalogs
   (`i18n/en`, `i18n/de`) — `fl!` validates against EN at compile time.
 - Lint: `cargo clippy --all-targets -- -D warnings`.
-- Before a release: update dependencies to the latest versions
-  (`cargo update` in Cargo.lock; check for available major bumps in
-  `Cargo.toml`), then run the full test suite and clippy again.
+- **Before EVERY release (mandatory):** run `cargo update` first, check
+  for available major bumps of the direct dependencies in `Cargo.toml`
+  and apply sensible ones, then run the full test suite and clippy again.
+  Never tag a release from a stale Cargo.lock.
 - Release: `cargo build --release` (10–15 min), then `./install.sh`
   (binaries → `~/.local/bin`, desktop entry →
   `~/.local/share/applications/net.d11n.CosmicHomeassistant.desktop`,
