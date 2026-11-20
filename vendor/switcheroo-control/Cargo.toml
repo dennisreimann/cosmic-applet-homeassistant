@@ -1,0 +1,13 @@
+# Vendored snapshot: pop-os/dbus-settings-bindings @ eed01dd3609e90e3c8cd043656734c500956c793
+# (MPL-2.0, siehe LICENSE.md). Upstream main hat das Crate zu
+# "switcheroo-control-zbus" umbenannt; der gepinnte libcosmic-Rev (über
+# cosmic-launch) braucht weiterhin den alten Namen. Genau wie
+# vendor/cosmic-settings-daemon — siehe dessen README.
+[package]
+name = "switcheroo-control"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+
+[dependencies]
+zbus = { version = "5.14.0" }

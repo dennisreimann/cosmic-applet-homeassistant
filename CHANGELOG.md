@@ -11,6 +11,19 @@ then renamed to the new version and emptied).
 
 ## [Unreleased]
 
+### Dependencies
+
+- `cargo update` works fully again: upstream renamed
+  `cosmic-settings-daemon` and `switcheroo-control` in
+  dbus-settings-bindings `main` (to `-zbus`, zbus 6), while the pinned
+  libcosmic rev still requires the old names. Both crates are now
+  vendored under `vendor/` (MPL-2.0 snapshots at the revision the build
+  already used) and attached via `[patch]`; all other dependencies of
+  that repo (and the rest of the tree) update normally.
+- Dependency refresh via full `cargo update` (git dependencies of the
+  pinned libcosmic tree: cosmic-panel, cosmic-protocols,
+  freedesktop-icons, …).
+
 ## [1.2.2] - 2026-11-14
 
 ### Fixed

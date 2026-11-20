@@ -1,0 +1,15 @@
+# Vendored snapshot: pop-os/dbus-settings-bindings @ eed01dd3609e90e3c8cd043656734c500956c793
+# (MPL-2.0, siehe LICENSE.md). Upstream main hat das Crate zu
+# "cosmic-settings-daemon-zbus" umbenannt; der gepinnte libcosmic-Rev
+# braucht aber weiterhin den alten Namen. Der Snapshot ist über den
+# [patch]-Eintrag in der Cargo.toml des Workspace angebunden und hält
+# `cargo update` funktionsfähig. Änderungen an libcosmic (neuer Rev mit
+# zbus-6-Bindings) machen dieses Vendor obsolet.
+[package]
+name = "cosmic-settings-daemon"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+
+[dependencies]
+zbus = { version = "5.14.0" }
