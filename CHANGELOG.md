@@ -11,6 +11,15 @@ then renamed to the new version and emptied).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-14
+
+### Fixed
+
+- Numeric entity values are rounded to at most three decimal places in
+  the panel line and the popup (e.g. `23.456789` → `23.457`); trailing
+  zeros are trimmed (`23.500` → `23.5`) and non-numeric states (e.g.
+  `on`) are displayed unchanged.
+
 ## [1.2.1] - 2026-11-13
 
 ### Fixed

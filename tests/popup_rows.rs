@@ -56,6 +56,28 @@ fn rows_in_config_order_name_left_value_right() {
 }
 
 #[test]
+fn numeric_states_rounded_to_max_three_decimals() {
+    let e = vec![EntityConfig {
+        entity_id: "sensor.temp".into(),
+        name: "Temperatur".into(),
+    }];
+    let v = values(vec![
+        (
+            "sensor.temp",
+            Ok(EntityState {
+                state: "23.456789".into(),
+                unit: Some("°C".into()),
+                friendly_name: None,
+            }),
+        ),
+    ]);
+    assert_eq!(
+        popup_rows(&v, &e),
+        vec![("Temperatur".to_string(), "23.457 °C".to_string())]
+    );
+}
+
+#[test]
 fn failed_entity_shows_dash() {
     let e = vec![EntityConfig {
         entity_id: "sensor.x".into(),

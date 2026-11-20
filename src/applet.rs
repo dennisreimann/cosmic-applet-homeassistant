@@ -46,6 +46,25 @@ pub fn fmt_updated(unix: i64) -> String {
         .unwrap_or_else(|| unix.to_string())
 }
 
+/// numerische States auf maximal 3 Nachkommastellen runden; nicht-numerische
+/// States (z. B. "on") bleiben unverändert. Überzählige Nullen am Ende werden
+/// entfernt (23.500 → 23.5, 21.000 → 21).
+#[must_use]
+pub fn format_state(state: &str) -> String {
+    match state.trim().parse::<f64>() {
+        Ok(v) if v.is_finite() => {
+            let rounded = (v * 1000.0).round() / 1000.0;
+            let mut s = format!("{:.3}", rounded);
+            s = s.trim_end_matches('0').trim_end_matches('.').to_string();
+            if s == "-0" {
+                s = "0".to_string();
+            }
+            s
+        }
+        _ => state.to_string(),
+    }
+}
+
 /// Panel-Zeile: Werte aller konfigurierten Entities in Konfig-Reihenfolge.
 /// Keine Entities → leerer String (dann nur das Logo).
 pub fn format_panel_line(values: &EntityValues, entities: &[EntityConfig]) -> String {
@@ -54,8 +73,8 @@ pub fn format_panel_line(values: &EntityValues, entities: &[EntityConfig]) -> St
         .filter_map(|e| {
             values.get(&e.entity_id).map(|r| match r {
                 Ok(s) => match &s.unit {
-                    Some(unit) => format!("{} {}", s.state, unit),
-                    None => s.state.clone(),
+                    Some(unit) => format!("{} {}", format_state(&s.state), unit),
+                    None => format_state(&s.state),
                 },
                 Err(()) => "—".to_string(),
             })
@@ -191,8 +210,8 @@ pub fn popup_rows(values: &EntityValues, entities: &[EntityConfig]) -> Vec<(Stri
         .map(|e| {
             let value = match values.get(&e.entity_id) {
                 Some(Ok(s)) => match &s.unit {
-                    Some(unit) => format!("{} {}", s.state, unit),
-                    None => s.state.clone(),
+                    Some(unit) => format!("{} {}", format_state(&s.state), unit),
+                    None => format_state(&s.state),
                 },
                 _ => "—".to_string(),
             };

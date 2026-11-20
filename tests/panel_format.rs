@@ -55,6 +55,63 @@ fn values_in_config_order_with_unit() {
 }
 
 #[test]
+fn numeric_states_rounded_to_max_three_decimals() {
+    let e = vec![EntityConfig {
+        entity_id: "sensor.temp".into(),
+        name: "Temperatur".into(),
+    }];
+    let v = values(vec![
+        (
+            "sensor.temp",
+            Ok(EntityState {
+                state: "23.456789".into(),
+                unit: Some("°C".into()),
+                friendly_name: None,
+            }),
+        ),
+    ]);
+    assert_eq!(format_panel_line(&v, &e), "23.457 °C");
+}
+
+#[test]
+fn numeric_states_keep_short_decimals_and_trim_zeros() {
+    let e = vec![EntityConfig {
+        entity_id: "sensor.temp".into(),
+        name: "Temperatur".into(),
+    }];
+    let v = values(vec![
+        (
+            "sensor.temp",
+            Ok(EntityState {
+                state: "23.500".into(),
+                unit: Some("°C".into()),
+                friendly_name: None,
+            }),
+        ),
+    ]);
+    assert_eq!(format_panel_line(&v, &e), "23.5 °C");
+}
+
+#[test]
+fn non_numeric_states_unchanged() {
+    let e = vec![EntityConfig {
+        entity_id: "sensor.x".into(),
+        name: "X".into(),
+    }];
+    let v = values(vec![
+        (
+            "sensor.x",
+            Ok(EntityState {
+                state: "on".into(),
+                unit: None,
+                friendly_name: None,
+            }),
+        ),
+    ]);
+    assert_eq!(format_panel_line(&v, &e), "on");
+}
+
+#[test]
 fn failed_entity_renders_dash() {
     let v = values(vec![
         ("sensor.temp", Err(())),
